@@ -1,0 +1,13 @@
+Bindings saved to keyboard_bindings.json
+a
+ab
+abc
+ab
+a
+ab
+volume increased +20%
+volume decreased +0%
+media player launched
+abd
+ab
+media player closed
