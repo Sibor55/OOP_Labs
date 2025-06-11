@@ -1,1 +1,0 @@
-{"a": {"type": "PrintCharCommand", "char": "a"}, "b": {"type": "PrintCharCommand", "char": "b"}, "c": {"type": "PrintCharCommand", "char": "c"}, "d": {"type": "PrintCharCommand", "char": "d"}, "ctrl++": {"type": "VolumeUpCommand"}, "ctrl+-": {"type": "VolumeDownCommand"}, "ctrl+p": {"type": "MediaPlayerCommand"}}

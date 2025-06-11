@@ -25,7 +25,10 @@ class SimpleLogFilter(ILogFilter):
 
 class ReLogFilter(ILogFilter):
     def __init__(self, regex_pattern: str):
-        self.pattern = re.compile(regex_pattern)
+        try:
+            self.pattern = re.compile(regex_pattern)
+        except re.error as e:
+            raise ValueError(f"Неверное регулярное выражение: {regex_pattern}") from e # Обработка ошибки комплияции
 
     def match(self, text: str) -> bool:
         return bool(self.pattern.search(text))
