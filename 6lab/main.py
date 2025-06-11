@@ -5,93 +5,91 @@ from abc import ABC, abstractmethod
 # Базовый класс для команд
 class Command(ABC):
     @abstractmethod
-    def execute(self):
+    def execute(self, context):
         pass
 
     @abstractmethod
-    def undo(self):
+    def undo(self, context):
         pass
 
     @abstractmethod
-    def redo(self):
+    def redo(self, context):
         pass
 
 
 # Команда для печати символа
 class PrintCharCommand(Command):
-    def __init__(self, keyboard, char):
-        self.keyboard = keyboard
+    def __init__(self, char):
         self.char = char
 
-    def execute(self):
-        self.keyboard.text += self.char
-        self.keyboard.output(self.keyboard.text)
+    def execute(self, context):
+        context['text'] += self.char
+        return context['text']
 
-    def undo(self):
-        self.keyboard.text = self.keyboard.text[:-1]
-        self.keyboard.output(self.keyboard.text)
+    def undo(self, context):
+        context['text'] = context['text'][:-1]
+        return context['text']
 
-    def redo(self):
-        self.execute()
+    def redo(self, context):
+        return self.execute(context)
 
 
 # Команда для увеличения громкости
 class VolumeUpCommand(Command):
-    def __init__(self, keyboard):
-        self.keyboard = keyboard
-        self.prev_volume = keyboard.volume
+    def __init__(self):
+        self.prev_volume = None
 
-    def execute(self):
-        self.prev_volume = self.keyboard.volume
-        self.keyboard.volume = min(100, self.keyboard.volume + 20)
-        self.keyboard.output(f"volume increased +{self.keyboard.volume}%")
+    def execute(self, context):
+        self.prev_volume = context['volume']
+        context['volume'] = min(100, context['volume'] + 20)
+        return f"volume increased +{context['volume']}%"
 
-    def undo(self):
-        self.keyboard.volume = self.prev_volume
-        self.keyboard.output(f"volume decreased +{self.keyboard.volume}%")
+    def undo(self, context):
+        current_volume = context['volume']
+        context['volume'] = self.prev_volume
+        return f"volume decreased +{context['volume']}%"
 
-    def redo(self):
-        self.execute()
+    def redo(self, context):
+        return self.execute(context)
 
 
 # Команда для уменьшения громкости
 class VolumeDownCommand(Command):
-    def __init__(self, keyboard):
-        self.keyboard = keyboard
-        self.prev_volume = keyboard.volume
+    def __init__(self):
+        self.prev_volume = None
 
-    def execute(self):
-        self.prev_volume = self.keyboard.volume
-        self.keyboard.volume = max(0, self.keyboard.volume - 20)
-        self.keyboard.output(f"volume decreased +{self.keyboard.volume}%")
+    def execute(self, context):
+        self.prev_volume = context['volume']
+        context['volume'] = max(0, context['volume'] - 20)
+        return f"volume decreased +{context['volume']}%"
 
-    def undo(self):
-        self.keyboard.volume = self.prev_volume
-        self.keyboard.output(f"volume increased +{self.keyboard.volume}%")
+    def undo(self, context):
+        current_volume = context['volume']
+        context['volume'] = self.prev_volume
+        return f"volume increased +{context['volume']}%"
 
-    def redo(self):
-        self.execute()
+    def redo(self, context):
+        return self.execute(context)
 
 
 # Команда для управления медиаплеером
 class MediaPlayerCommand(Command):
-    def __init__(self, keyboard):
-        self.keyboard = keyboard
-        self.prev_state = keyboard.media_player_on
+    def __init__(self):
+        self.prev_state = None
 
-    def execute(self):
-        self.prev_state = self.keyboard.media_player_on
-        self.keyboard.media_player_on = not self.keyboard.media_player_on
-        action = "launched" if self.keyboard.media_player_on else "closed"
-        self.keyboard.output(f"media player {action}")
+    def execute(self, context):
+        self.prev_state = context['media_player_on']
+        context['media_player_on'] = not context['media_player_on']
+        action = "launched" if context['media_player_on'] else "closed"
+        return f"media player {action}"
 
-    def undo(self):
-        self.keyboard.media_player_on = self.prev_state
-        action = "launched" if self.keyboard.media_player_on else "closed"
-        self.keyboard.output(f"media player {action}")
+    def undo(self, context):
+        context['media_player_on'] = self.prev_state
+        action = "launched" if context['media_player_on'] else "closed"
+        return f"media player {action}"
 
-    def redo(self):
-        self.execute()
+    def redo(self, context):
+        return self.execute(context)
 
 
 # Класс для сохранения/восстановления состояния (Memento)
@@ -113,7 +111,7 @@ class KeyboardStateSaver:
             json.dump(serialized, f)
 
     @staticmethod
-    def load_from_file(keyboard, filename):
+    def load_from_file(filename):
         try:
             with open(filename, "r") as f:
                 data = json.load(f)
@@ -122,13 +120,13 @@ class KeyboardStateSaver:
             for key, cmd_data in data.items():
                 cmd_type = cmd_data["type"]
                 if cmd_type == "PrintCharCommand":
-                    bindings[key] = PrintCharCommand(keyboard, cmd_data["char"])
+                    bindings[key] = PrintCharCommand(cmd_data["char"])
                 elif cmd_type == "VolumeUpCommand":
-                    bindings[key] = VolumeUpCommand(keyboard)
+                    bindings[key] = VolumeUpCommand()
                 elif cmd_type == "VolumeDownCommand":
-                    bindings[key] = VolumeDownCommand(keyboard)
+                    bindings[key] = VolumeDownCommand()
                 elif cmd_type == "MediaPlayerCommand":
-                    bindings[key] = MediaPlayerCommand(keyboard)
+                    bindings[key] = MediaPlayerCommand()
 
             return bindings
         except FileNotFoundError:
@@ -138,9 +136,11 @@ class KeyboardStateSaver:
 # Основной класс клавиатуры
 class Keyboard:
     def __init__(self):
-        self.text = ""
-        self.volume = 0
-        self.media_player_on = False
+        self.context = {
+            'text': "",
+            'volume': 0,
+            'media_player_on': False
+        }
         self.bindings = {}
         self.history = []
         self.redo_stack = []
@@ -161,8 +161,9 @@ class Keyboard:
         """Обработка нажатия клавиши"""
         if key in self.bindings:
             cmd = self.bindings[key]
-            cmd.execute()
-            self.history.append(cmd)
+            result = cmd.execute(self.context)
+            self.output(result)
+            self.history.append((cmd, self.context.copy()))
             self.redo_stack = []
         else:
             self.output(f"Unknown command: {key}")
@@ -170,16 +171,20 @@ class Keyboard:
     def undo(self):
         """Отмена последнего действия"""
         if self.history:
-            cmd = self.history.pop()
-            cmd.undo()
-            self.redo_stack.append(cmd)
+            cmd, prev_context = self.history.pop()
+            result = cmd.undo(prev_context)
+            self.output(result)
+            self.context = prev_context
+            self.redo_stack.append((cmd, self.context.copy()))
 
     def redo(self):
         """Повтор последнего отмененного действия"""
         if self.redo_stack:
-            cmd = self.redo_stack.pop()
-            cmd.redo()
-            self.history.append(cmd)
+            cmd, next_context = self.redo_stack.pop()
+            result = cmd.redo(next_context)
+            self.output(result)
+            self.context = next_context
+            self.history.append((cmd, self.context.copy()))
 
     def save_bindings(self, filename="keyboard_bindings.json"):
         """Сохранение привязок клавиш"""
@@ -188,7 +193,7 @@ class Keyboard:
 
     def load_bindings(self, filename="keyboard_bindings.json"):
         """Загрузка привязок клавиш"""
-        self.bindings = KeyboardStateSaver.load_from_file(self, filename)
+        self.bindings = KeyboardStateSaver.load_from_file(filename)
         self.output(f"Bindings loaded from {filename}")
 
     def close(self):
@@ -201,13 +206,13 @@ if __name__ == "__main__":
     kb = Keyboard()
 
     # Инициализация команд
-    kb.assign_command("a", PrintCharCommand(kb, "a"))
-    kb.assign_command("b", PrintCharCommand(kb, "b"))
-    kb.assign_command("c", PrintCharCommand(kb, "c"))
-    kb.assign_command("d", PrintCharCommand(kb, "d"))
-    kb.assign_command("ctrl++", VolumeUpCommand(kb))
-    kb.assign_command("ctrl+-", VolumeDownCommand(kb))
-    kb.assign_command("ctrl+p", MediaPlayerCommand(kb))
+    kb.assign_command("a", PrintCharCommand("a"))
+    kb.assign_command("b", PrintCharCommand("b"))
+    kb.assign_command("c", PrintCharCommand("c"))
+    kb.assign_command("d", PrintCharCommand("d"))
+    kb.assign_command("ctrl++", VolumeUpCommand())
+    kb.assign_command("ctrl+-", VolumeDownCommand())
+    kb.assign_command("ctrl+p", MediaPlayerCommand())
 
     # Сохраняем привязки
     kb.save_bindings()
