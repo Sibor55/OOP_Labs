@@ -1,10 +1,12 @@
+# https://en.wikipedia.org/wiki/Observer_pattern !!!
 from abc import abstractmethod
 from typing import Any, List, Protocol, TypeVar
 
-T = TypeVar("T")
+T = TypeVar("T") # Тип объекта, за которым следят слушатели
 
 
-# 1. Протокол слушателя изменений свойства (после изменения)
+# 1. Протокол слушателя изменений свойства (после изменения) 
+# (Observer Pattern - слушатель получает уведомления об изменениях)
 class PropertyChangedListenerProtocol(Protocol):
     @abstractmethod
     def on_property_changed(self, obj: T, property_name: str) -> None:
@@ -18,7 +20,7 @@ class PropertyChangedListenerProtocol(Protocol):
         ...
 
 
-# 2. Протокол для управления слушателями изменений
+# 2. Протокол для управления слушателями изменений 
 class DataChangedProtocol(Protocol):
     @abstractmethod
     def add_property_changed_listener(
@@ -45,14 +47,17 @@ class DataChangedProtocol(Protocol):
         ...
 
 
-# 3. Базовый класс с поддержкой уведомлений об изменениях
+# 3. Базовый класс с поддержкой уведомлений об изменениях 
+# (Observable - объект, за которым можно наблюдать)
 class ObservableModel(DataChangedProtocol):
     def __init__(self) -> None:
+        # Список слушателей
         self._listeners: List[PropertyChangedListenerProtocol] = []
 
     def add_property_changed_listener(
         self, listener: PropertyChangedListenerProtocol
     ) -> None:
+        # Проверка на уникальность
         if listener not in self._listeners:
             self._listeners.append(listener)
 
@@ -64,11 +69,13 @@ class ObservableModel(DataChangedProtocol):
 
     def _notify_property_changed(self, property_name: str) -> None:
         """Уведомляет всех слушателей об изменении свойства"""
+        #Итерация по копии списка при изменении во время уведомления
         for listener in self._listeners:
             listener.on_property_changed(self, property_name)
 
 
-# 4. Протокол слушателя валидации изменений (до изменения)
+# 4. Протокол слушателя валидации изменений (до изменения) 
+# (Валидатор - проверяет допустимость изменений ДО их применения)
 class PropertyChangingListenerProtocol(Protocol):
     @abstractmethod
     def on_property_changing(
@@ -153,7 +160,7 @@ class ValidatableModel(ObservableModel, DataChangingProtocol):
         if not self._validate_property_change(property_name, current_value, new_value):
             return False
 
-        # Применение изменения
+        # Применение изменения (защищенные свойства используют префикс '_')
         setattr(self, f"_{property_name}", new_value)
         self._notify_property_changed(property_name)
         return True
@@ -165,7 +172,7 @@ class Person(ValidatableModel):
         super().__init__()
         self._name = name
         self._age = age
-
+# Свойства с контролируемым доступом
     @property
     def name(self) -> str:
         return self._name
@@ -183,7 +190,7 @@ class Person(ValidatableModel):
         self._set_property("age", self._age, value)
 
 
-# 8. Реализация слушателей
+# 8. Реализация слушателей и валидаторов 
 class Logger(PropertyChangedListenerProtocol):
     def on_property_changed(self, obj: Any, property_name: str) -> None:
         print(

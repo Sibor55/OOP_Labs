@@ -1,16 +1,20 @@
+# https://en.wikipedia.org/wiki/Logging_(computing)
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 
 
 # 1. Протокол для фильтров
+# Протокол/Интерфейс - определяет контракт
+# (функционал по которому определяется реализация функции для классов(Должен быть match в фильтре, handle в обработчике)),
+# который должны реализовать все классы фильтров
 class ILogFilter(ABC):
     @abstractmethod
     def match(self, text: str) -> bool:
         pass
 
 
-# 2. Реализации фильтров
+# 2. Реализации фильтров 
 class SimpleLogFilter(ILogFilter):
     def __init__(self, pattern: str):
         self.pattern = pattern
@@ -61,7 +65,7 @@ class SyslogHandler(ILogHandler):
             f"\033[92mSYSLOG [{timestamp}] {self.app_name}: {text}\033[0m"
         )  # Зеленый цвет
 
-
+# Типо реализация сокетхендлера, на самом деле через сокет надо было и нужно поднимать сервер чтобы это делать
 class SocketHandler(ILogHandler):
     def __init__(self, host: str, port: int):
         self.host = host
@@ -73,7 +77,7 @@ class SocketHandler(ILogHandler):
         )  # Желтый цвет
 
 
-# 5. Основной класс Logger
+# 5. Основной класс Logger(Композиция (агрегация) - logger содержит фильтры и обработчики как зависимости)
 class Logger:
     def __init__(
         self, filters: list[ILogFilter] = None, handlers: list[ILogHandler] = None
@@ -87,12 +91,12 @@ class Logger:
             if not log_filter.match(text):
                 return  # Сообщение не проходит фильтрацию
 
-        # Передача сообщения обработчикам
+        # Передача сообщения всем обработчикам
         for handler in self.handlers:
             handler.handle(text)
 
 
-# 6. Демонстрация работы
+# 6. Демонстрация работы(Dependency Injection - зависимости создаются вне logger'а и передаются в него)
 if __name__ == "__main__":
 
     # Создаем обработчики
